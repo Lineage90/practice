@@ -5,9 +5,10 @@
 # This workflow will build a Java project with Gradle and cache/restore any dependencies to improve the workflow execution time
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-java-with-gradle
 
-name: Java CI with Gradle
+name: Java CI with Gradle # workflow 이름 지정
 
-on:
+on:  # 작동 트리거로 설정할 부분 작성
+     # master 브랜치로 push 또는 pull_request가 일어날 경우 해당 workflow 실행
   push:
     branches: [ "master" ]
   pull_request:
