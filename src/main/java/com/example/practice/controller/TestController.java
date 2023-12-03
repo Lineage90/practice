@@ -9,6 +9,6 @@ public class TestController {
 
     @GetMapping("/")
     public String home() {
-        return "Hello CICD with DockerHub!";
+        return "Hello CICD with DockerHub! need money";
     }
 }
