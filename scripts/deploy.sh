@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-REPOSITORY=/home/ubuntu/moduform
+REPOSITORY=/home/ubuntu/practice
 cd $REPOSITORY
 
 APP_NAME=practice
