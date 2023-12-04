@@ -9,6 +9,6 @@ public class TestController {
 
     @GetMapping("/")
     public String home() {
-        return "Hello CICD with DockerHub! need money";
+        return "Hello CICD with DockerHub! need money + S3, CodeDeploy 사용입니다";
     }
 }
