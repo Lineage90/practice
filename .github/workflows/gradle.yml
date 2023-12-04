@@ -14,6 +14,12 @@ on: # 작동 트리거로 설정할 부분 작성
   pull_request:
     branches: [ "master" ]
 
+env:
+  PROJECT_NAME: ga_cicd
+  BUCKET_NAME: ga-cicd-bucket
+  CODE_DEPLOY_APP_NAME: ga-practice
+  DEPLOYMENT_GROUP_NAME: ga-cd
+
 permissions:
   contents: read
 
@@ -41,39 +47,61 @@ jobs:
       # Gradle Build를 위한 권한 부여
       - name: Run chmod to make gradlew executable
         run: chmod +x ./gradlew
+# ___________________ Docker Hub 사용
 
-      # DockerHub 로그인
-      - name: DockerHub Login
-        uses: docker/login-action@v2
+#      # DockerHub 로그인
+#      - name: DockerHub Login
+#        uses: docker/login-action@v2
+#        with:
+#          username: ${{ secrets.DOCKERHUB_USERNAME }}
+#          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+#
+#      # Docker 이미지 빌드
+#      - name: Docker Image Build
+#        run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.PROJECT_NAME }} .
+#
+#      # DockerHub Push
+#      - name: DockerHub Push
+#        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.PROJECT_NAME }}
+#
+#      # EC2 인스턴스 접속 및 애플리케이션 실행
+#      - name: Application Run
+#        uses: appleboy/ssh-action@v0.1.6
+#        with:
+#          host: ${{ secrets.EC2_HOST }}
+#          username: ${{ secrets.EC2_USERNAME }}
+#          key: ${{ secrets.EC2_KEY }}
+#
+#          script: |
+#            sudo docker kill ${{ secrets.PROJECT_NAME }}
+#            sudo docker rm -f ${{ secrets.PROJECT_NAME }}
+#            sudo docker rmi ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.PROJECT_NAME }}
+#            sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.PROJECT_NAME }}
+#
+#            sudo docker run -p ${{ secrets.PORT }}:${{ secrets.PORT }} \
+#            --name ${{ secrets.PROJECT_NAME }} \
+#            -e SPRING_DATASOURCE_URL=${{ secrets.DB_URL }} \
+#            -e SPRING_DATASOURCE_USERNAME=${{ secrets.DB_USERNAME }} \
+#            -e SPRING_DATASOURCE_PASSWORD=${{ secrets.DB_PASSWORD }} \
+#            -d ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.PROJECT_NAME }}
+
+      - name: Make Zip File
+        run: zip -qq -r ./$GITHUB_SHA.zip .
+        shell: bash
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_PRIVATE_ACCESS_KEY }}
+          aws-region: ap-northeast-2
 
-      # Docker 이미지 빌드
-      - name: Docker Image Build
-        run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.PROJECT_NAME }} .
+      - name: Upload to S3
+        run: aws s3 cp --region ap-northeast-2 ./$GITHUB_SHA.zip s3://$BUCKET_NAME/$PROJECT_NAME/$GITHUB_SHA.zip
 
-      # DockerHub Push
-      - name: DockerHub Push
-        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.PROJECT_NAME }}
-
-      # EC2 인스턴스 접속 및 애플리케이션 실행
-      - name: Application Run
-        uses: appleboy/ssh-action@v0.1.6
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.EC2_KEY }}
-
-          script: |
-            sudo docker kill ${{ secrets.PROJECT_NAME }}
-            sudo docker rm -f ${{ secrets.PROJECT_NAME }}
-            sudo docker rmi ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.PROJECT_NAME }}
-            sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.PROJECT_NAME }}
-            
-            sudo docker run -p ${{ secrets.PORT }}:${{ secrets.PORT }} \
-            --name ${{ secrets.PROJECT_NAME }} \
-            -e SPRING_DATASOURCE_URL=${{ secrets.DB_URL }} \
-            -e SPRING_DATASOURCE_USERNAME=${{ secrets.DB_USERNAME }} \
-            -e SPRING_DATASOURCE_PASSWORD=${{ secrets.DB_PASSWORD }} \
-            -d ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.PROJECT_NAME }}
+      - name: Code Deploy To EC2 instance
+        run: aws deploy create-deployment
+                --application-name $CODE_DEPLOY_APP_NAME
+                --deployment-config-name CodeDeployDefault.AllAtOnce
+                --deployment-group-name $DEPLOYMENT_GROUP_NAME
+                --s3-location bucket=$BUCKET_NAME,bundleType=zip,key=$PROJECT_NAME/$GITHUB_SHA.zip
